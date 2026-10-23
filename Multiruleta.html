@@ -1,0 +1,629 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Multiruleta</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: título · ruletas verticales planas en fila, con flechas entre columnas · panel "agregar ruleta" · botón Lanzar · resultado */
+:root{
+  --bg:#0a0a0d;
+  --surface:#121217;
+  --surface-2:#1a1a21;
+  --line:#272730;
+  --line-soft:#1e1e26;
+  --fg:#ececf1;
+  --muted:#8b8b97;
+  --c1:#7aa2ff;  /* azul */
+  --c2:#b691ff;  /* violeta */
+  --c3:#ff8fb3;  /* rosa */
+  --c4:#f3b868;  /* ámbar */
+  --c5:#5fd3c3;  /* turquesa */
+  --c6:#9fd47a;  /* verde */
+  --g-red:rgba(255,70,110,.6);
+  --g-cyan:rgba(70,225,215,.55);
+  --font-ui:"Geist",ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-mono:"Geist Mono",ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;
+  --head:34px;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{
+  color:var(--fg);font-family:var(--font-ui);-webkit-font-smoothing:antialiased;
+  background:
+    radial-gradient(900px 420px at 15% -10%, rgba(122,162,255,.10), transparent 70%),
+    radial-gradient(800px 400px at 90% 0%, rgba(182,145,255,.09), transparent 70%),
+    radial-gradient(700px 380px at 50% 110%, rgba(255,143,179,.06), transparent 70%),
+    var(--bg);
+  background-attachment:fixed;
+}
+body::after{
+  content:"";position:fixed;inset:0;pointer-events:none;z-index:50;
+  background:repeating-linear-gradient(180deg,rgba(255,255,255,.02) 0 1px,transparent 1px 3px);
+  mix-blend-mode:overlay;
+}
+.app{
+  min-height:100%;display:flex;flex-direction:column;gap:22px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-block:26px 40px;max-width:1400px;margin:0 auto;box-sizing:border-box;
+}
+button{font-family:inherit}
+:focus-visible{outline:2px solid var(--c1);outline-offset:2px}
+
+/* ---------- título ---------- */
+.glitch{
+  position:relative;margin:0;align-self:center;
+  font-size:clamp(28px,5vw,46px);font-weight:700;letter-spacing:-.025em;line-height:1;
+  background:linear-gradient(90deg,var(--c1),var(--c2) 45%,var(--c3));
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+}
+.glitch::before,.glitch::after{content:attr(data-text);position:absolute;inset:0;opacity:0;pointer-events:none;-webkit-text-fill-color:currentColor}
+.glitch::before{color:var(--g-red);animation:gl1 7s steps(1) infinite}
+.glitch::after{color:var(--g-cyan);animation:gl2 7s steps(1) infinite}
+.is-spinning .glitch::before,.is-spinning .glitch::after{animation-duration:.6s}
+@keyframes gl1{0%,91%,100%{opacity:0}92%{opacity:1;clip-path:inset(10% 0 60% 0);transform:translateX(-3px)}94%{opacity:1;clip-path:inset(55% 0 20% 0);transform:translateX(2px)}96%{opacity:0}}
+@keyframes gl2{0%,92%,100%{opacity:0}93%{opacity:1;clip-path:inset(40% 0 35% 0);transform:translateX(3px)}95%{opacity:1;clip-path:inset(5% 0 80% 0);transform:translateX(-2px)}97%{opacity:0}}
+
+/* ---------- escenario ---------- */
+.stage{overflow-x:auto;padding-block:4px 12px;scrollbar-width:thin;scrollbar-color:var(--line) transparent}
+.stage-inner{display:flex;align-items:flex-start;justify-content:center;width:max-content;min-width:100%;margin-inline:auto;padding-inline:4px;box-sizing:border-box}
+
+.reel{display:flex;flex-direction:column;gap:10px;flex:none}
+.reel-head{height:var(--head);display:flex;align-items:center;gap:8px;padding:0 4px}
+.reel-head .dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--c) 18%,transparent)}
+.reel-title{
+  flex:1;min-width:0;background:transparent;border:0;border-bottom:1px dashed transparent;color:var(--fg);
+  font:600 15px/1.4 var(--font-ui);padding:2px 0;
+}
+.reel-title:hover{border-bottom-color:var(--line)}
+.reel-title:focus{outline:none;border-bottom:1px solid var(--c)}
+.x{
+  appearance:none;border:0;background:transparent;color:var(--muted);cursor:pointer;
+  width:26px;height:26px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;flex:none;
+}
+.x:hover{background:var(--surface-2);color:var(--fg)}
+.x svg{width:13px;height:13px}
+
+.window{
+  position:relative;overflow:hidden;border-radius:14px;
+  border:1px solid color-mix(in srgb,var(--c) 32%,var(--line));
+  background:linear-gradient(180deg,color-mix(in srgb,var(--c) 7%,#121217),color-mix(in srgb,var(--c) 3%,#0f0f13));
+}
+.window::after{ /* sombreado de tambor, sin inclinar el texto */
+  content:"";position:absolute;inset:0;pointer-events:none;z-index:3;
+  background:linear-gradient(180deg,rgba(5,5,8,.45),transparent 16%,transparent 84%,rgba(5,5,8,.45));
+}
+.face{
+  position:absolute;left:0;right:0;top:0;
+  display:flex;align-items:center;justify-content:center;
+  border-top:1px solid color-mix(in srgb,var(--c) 14%,var(--line-soft));box-sizing:border-box;
+  transition:background .3s;
+}
+.face.top-row{border-top-color:transparent}
+.face::before{
+  content:"";position:absolute;left:0;top:18%;bottom:18%;width:3px;border-radius:0 3px 3px 0;
+  background:var(--c);opacity:0;transition:opacity .3s;
+}
+.face.hit{background:color-mix(in srgb,var(--c) 12%,transparent)}
+.face.hit::before{opacity:1}
+.face .num{
+  position:absolute;left:12px;top:50%;transform:translateY(-50%);z-index:1;
+  font:500 11px/1 var(--font-mono);color:var(--muted);font-variant-numeric:tabular-nums;pointer-events:none;
+}
+.face input{
+  position:relative;z-index:1;width:100%;box-sizing:border-box;background:transparent;border:0;color:var(--fg);
+  text-align:center;font:500 var(--fs,19px)/1.2 var(--font-ui);padding:6px 34px;text-overflow:ellipsis;cursor:text;
+  filter:blur(var(--blur,0px));
+}
+.face input::placeholder{color:var(--muted);opacity:.55}
+.face input:focus{outline:none;color:#fff}
+.face:focus-within{background:color-mix(in srgb,var(--c) 10%,transparent)}
+.face:focus-within input{text-decoration:underline;text-decoration-color:var(--c);text-underline-offset:6px;text-decoration-thickness:1px}
+.face .del{position:absolute;right:6px;top:50%;transform:translateY(-50%);z-index:2;opacity:0}
+.face:hover .del,.face:focus-within .del{opacity:1}
+@media (hover:none){.face .del{opacity:.6}}
+
+.is-spinning .face input{text-shadow:1.5px 0 var(--g-red),-1.5px 0 var(--g-cyan)}
+.reel.glitching .face input{animation:jit .38s steps(4) both}
+.reel.glitching .window{animation:shake .38s steps(3)}
+@keyframes jit{
+  0%{text-shadow:none;clip-path:inset(0)}
+  25%{text-shadow:3px 0 var(--g-red),-3px 0 var(--g-cyan);transform:translateX(4px);clip-path:inset(20% 0 35% 0)}
+  50%{text-shadow:-2px 0 var(--g-red),2px 0 var(--g-cyan);transform:translateX(-5px);clip-path:inset(0 0 55% 0)}
+  75%{text-shadow:1px 0 var(--g-red),-1px 0 var(--g-cyan);transform:translateX(2px);clip-path:inset(45% 0 0 0)}
+  100%{text-shadow:none;transform:none;clip-path:inset(0)}
+}
+@keyframes shake{33%{transform:translateX(2px)}66%{transform:translateX(-2px)}}
+
+/* flechas entre ruletas */
+.link{flex:none;display:flex;flex-direction:column;margin-top:calc(var(--head) + 10px);padding-top:1px}
+.link span{display:flex;align-items:center;justify-content:center;color:var(--line);transition:color .3s}
+.link span svg{width:16px;height:16px}
+.link span.on{color:var(--muted)}
+
+.add-reel{
+  flex:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  width:96px;margin-top:calc(var(--head) + 10px);margin-left:18px;
+  border:1px dashed var(--line);border-radius:14px;background:transparent;color:var(--muted);
+  cursor:pointer;font:500 13px/1.3 var(--font-ui);text-align:center;padding:12px 8px;transition:border-color .2s,color .2s,background .2s;
+}
+.add-reel:hover{border-color:#40404c;color:var(--fg);background:rgba(255,255,255,.02)}
+.add-reel svg{width:20px;height:20px}
+
+/* ---------- acciones ---------- */
+.under{display:flex;justify-content:center}
+.ghost{
+  appearance:none;border:1px dashed var(--line);background:transparent;color:var(--muted);cursor:pointer;
+  height:36px;padding:0 14px;border-radius:10px;font:500 13px/1 var(--font-ui);display:inline-flex;align-items:center;gap:8px;
+}
+.ghost:hover:not(:disabled){color:var(--fg);border-color:#40404c}
+.ghost:disabled{opacity:.4;cursor:not-allowed}
+.ghost svg{width:14px;height:14px}
+.launch-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
+.launch{
+  appearance:none;border:0;cursor:pointer;
+  background:linear-gradient(100deg,var(--c1),var(--c2) 55%,var(--c3));color:#0c0c14;
+  font:700 19px/1 var(--font-ui);letter-spacing:.01em;
+  height:64px;min-width:min(340px,100%);padding:0 36px;border-radius:18px;
+  display:inline-flex;align-items:center;justify-content:center;gap:14px;
+  transition:transform .15s,filter .2s,opacity .2s;
+}
+.launch:hover:not(:disabled){filter:brightness(1.08)}
+.launch:active:not(:disabled){transform:translateY(1px) scale(.995)}
+.launch:disabled{opacity:.45;cursor:progress}
+.launch kbd{font:500 11px/1 var(--font-mono);padding:5px 7px;border-radius:6px;border:1px solid rgba(0,0,0,.2);background:rgba(255,255,255,.18)}
+.meta{font-family:var(--font-mono);font-size:12px;color:var(--muted);display:flex;flex-wrap:wrap;gap:6px 14px;justify-content:center}
+.meta b{color:var(--fg);font-weight:500;font-variant-numeric:tabular-nums}
+.linkish{appearance:none;border:0;background:none;color:var(--muted);font:500 13px/1 var(--font-ui);cursor:pointer;text-decoration:underline;text-underline-offset:3px;padding:4px}
+.linkish:hover{color:var(--fg)}
+
+/* ---------- resultado ---------- */
+.results{
+  border:1px solid var(--line);border-radius:16px;background:var(--surface);
+  padding:18px 20px 20px;display:flex;flex-direction:column;gap:14px;max-width:880px;width:100%;margin:0 auto;box-sizing:border-box;
+}
+.res-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.res-head h2{margin:0;font-size:15px;font-weight:600}
+.copy{appearance:none;border:1px solid var(--line);background:var(--surface-2);color:var(--fg);font:500 13px/1 var(--font-ui);height:32px;padding:0 12px;border-radius:10px;cursor:pointer}
+.copy:hover{border-color:#40404c}
+.table-wrap{overflow-x:auto}
+.res-table{width:100%;border-collapse:collapse;font-size:14px}
+.res-table th{text-align:left;font:500 11px/1 var(--font-mono);text-transform:uppercase;letter-spacing:.08em;padding:0 12px 10px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+.res-table td{padding:11px 12px 11px 0;border-bottom:1px solid var(--line-soft);vertical-align:top}
+.res-table tr:last-child td{border-bottom:0}
+.res-table td.n{font-family:var(--font-mono);font-size:12px;color:var(--muted);width:2.5em;font-variant-numeric:tabular-nums}
+.res-table td.arrow{color:var(--muted);width:1.2em;padding-right:8px}
+.res-table td:nth-child(2){font-weight:600}
+.results.reveal tbody tr{animation:rowin .45s steps(4) both}
+@keyframes rowin{
+  0%{opacity:0;clip-path:inset(0 100% 0 0)}
+  50%{opacity:1;clip-path:inset(0 30% 0 0);text-shadow:2px 0 var(--g-red),-2px 0 var(--g-cyan)}
+  100%{opacity:1;clip-path:inset(0);text-shadow:none}
+}
+.toast{
+  position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);
+  background:var(--fg);color:var(--bg);font:500 13px/1 var(--font-ui);padding:10px 14px;border-radius:10px;opacity:0;pointer-events:none;transition:.2s;z-index:60;
+}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){
+  .glitch::before,.glitch::after{animation:none!important}
+  .reel.glitching .face input,.reel.glitching .window,.results.reveal tbody tr{animation:none}
+}
+</style>
+
+<div class="app">
+  <h1 class="glitch" data-text="MULTIRULETA">MULTIRULETA</h1>
+
+  <main class="stage" id="stage">
+    <div class="stage-inner" id="inner"></div>
+  </main>
+
+  <div class="under">
+    <button class="ghost" id="addRow">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>
+      Agregar fila
+    </button>
+  </div>
+
+  <div class="launch-wrap">
+    <button class="launch" id="launch">Lanzar ruleta <kbd>Espacio</kbd></button>
+    <div class="meta" id="meta"></div>
+    <button class="linkish" id="resume" hidden>Volver a mezclar</button>
+  </div>
+
+  <section class="results" id="results" hidden aria-live="polite">
+    <div class="res-head">
+      <h2>Asignación</h2>
+      <button class="copy" id="copy">Copiar resultado</button>
+    </div>
+    <div id="resBody"></div>
+  </section>
+</div>
+<div class="toast" id="toast">Copiado</div>
+
+<script>
+(() => {
+  const KEY = 'multiruleta-v3';
+  const $ = id => document.getElementById(id);
+  const inner = $('inner'), stage = $('stage');
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MIX_MS = 3000, MAX_ROWS = 12, MAX_REELS = 6;
+  const COLORS = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c6'];
+
+  const DEFAULT = {
+    reels: [
+      { title: 'Integrantes', items: ['Camila', 'Benjamín', 'Fernanda', 'Tomás', 'Ignacio'] },
+      { title: 'Temas', items: ['Marco teórico', 'Estado del arte', 'Metodología', 'Análisis de resultados', 'Conclusiones'] }
+    ]
+  };
+  let state;
+  try { state = JSON.parse(localStorage.getItem(KEY)) || JSON.parse(localStorage.getItem('reparto-ruletas-v2')); } catch (e) { state = null; }
+  if (!state || !Array.isArray(state.reels) || state.reels.length < 2) state = structuredClone(DEFAULT);
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ reels: state.reels })); } catch (e) {} };
+
+  let mode = 'mixing';      // mixing | spinning | result
+  const R = [];
+  let links = [];
+  let rowH = 60;
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  const rows = () => state.reels[0].items.length;
+  const el = (t, c) => { const e = document.createElement(t); if (c) e.className = c; return e; };
+  const ICON_X = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+  const ICON_ARROW = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8h10M9.5 4.5L13 8l-3.5 3.5"/></svg>';
+
+  function shuffleNew(arr) {
+    if (arr.length < 2) return arr.slice();
+    let out, guard = 0;
+    do {
+      out = arr.slice();
+      for (let i = out.length - 1; i > 0; i--) { const j = (Math.random() * (i + 1)) | 0; [out[i], out[j]] = [out[j], out[i]]; }
+    } while (out.every((v, i) => v === arr[i]) && ++guard < 20);
+    return out;
+  }
+
+  const cellId = (ri, j) => `r${ri}-${j}`;
+  function focusCell(ri, j) { const e = $(cellId(ri, j)); if (e) { e.focus(); e.select(); } }
+
+  /* ---------- construir ---------- */
+  function build(focus) {
+    const n = rows();
+    inner.innerHTML = '';
+    R.length = 0; links = [];
+    state.reels.forEach((reel, ri) => {
+      if (ri > 0) {
+        const link = el('div', 'link');
+        for (let j = 0; j < n; j++) { const s = el('span'); s.innerHTML = ICON_ARROW; link.append(s); }
+        inner.append(link); links.push(link);
+      }
+      const fixed = ri === 0;
+      const root = el('div', 'reel');
+      root.style.setProperty('--c', `var(${COLORS[ri % COLORS.length]})`);
+      const head = el('div', 'reel-head');
+      const dot = el('span', 'dot');
+      const title = el('input', 'reel-title');
+      title.id = 'title-' + ri; title.value = reel.title; title.spellcheck = false;
+      title.setAttribute('aria-label', 'Nombre de la ruleta ' + (ri + 1));
+      title.addEventListener('input', () => { reel.title = title.value; save(); renderResults(false); });
+      title.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); focusCell(ri, 0); } });
+      head.append(dot, title);
+      if (ri > 0 && state.reels.length > 2) {
+        const rm = el('button', 'x'); rm.innerHTML = ICON_X; rm.title = 'Quitar esta ruleta';
+        rm.setAttribute('aria-label', 'Quitar ruleta ' + (ri + 1));
+        rm.addEventListener('click', () => { if (mode === 'spinning') return; state.reels.splice(ri, 1); save(); toMixing(); build(); });
+        head.append(rm);
+      }
+
+      const win = el('div', 'window');
+      const faces = [];
+      for (let c = -1; c <= 1; c++) {
+        for (let j = 0; j < n; j++) {
+          const f = el('div', 'face' + (j === 0 && c === 0 ? ' top-row' : ''));
+          const inp = el('input');
+          inp.value = reel.items[j];
+          inp.placeholder = 'Escribe…';
+          inp.spellcheck = false;
+          if (c === 0) {
+            inp.id = cellId(ri, j);
+            inp.setAttribute('aria-label', `${reel.title || 'Ruleta'}, fila ${j + 1}`);
+            inp.addEventListener('input', () => {
+              reel.items[j] = inp.value;
+              faces.forEach(o => { if (o.j === j && o.input !== inp) o.input.value = inp.value; });
+              save(); scheduleLayout(); renderResults(false);
+            });
+            inp.addEventListener('keydown', e => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              if (j < n - 1) focusCell(ri, j + 1);
+              else if (ri < state.reels.length - 1) focusCell(ri + 1, 0);
+              else inp.blur();
+            });
+            inp.addEventListener('paste', e => {
+              const text = (e.clipboardData || window.clipboardData)?.getData('text') || '';
+              const lines = text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+              if (lines.length < 2) return;
+              e.preventDefault();
+              pasteLines(ri, j, lines);
+            });
+            if (fixed) {
+              const num = el('span', 'num'); num.textContent = String(j + 1).padStart(2, '0'); f.append(num);
+              if (n > 2) {
+                const del = el('button', 'x del'); del.innerHTML = ICON_X; del.title = 'Quitar esta fila';
+                del.setAttribute('aria-label', 'Quitar fila ' + (j + 1));
+                del.addEventListener('click', () => removeRow(j));
+                f.append(del);
+              }
+            }
+          } else {
+            inp.tabIndex = -1; inp.setAttribute('aria-hidden', 'true'); inp.readOnly = true;
+          }
+          f.prepend(inp);
+          win.append(f);
+          faces.push({ el: f, input: inp, j, c });
+        }
+      }
+      root.append(head, win);
+      inner.append(root);
+      R.push({ root, win, faces, s: 0, fixed, ri });
+    });
+
+    const add = el('button', 'add-reel');
+    add.innerHTML = '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M10 4v12M4 10h12"/></svg>Agregar ruleta';
+    add.hidden = state.reels.length >= MAX_REELS;
+    add.addEventListener('click', addReel);
+    inner.append(add);
+
+    $('addRow').disabled = n >= MAX_ROWS;
+    layout();
+    renderMeta();
+    if (focus) focusCell(focus[0], focus[1]);
+  }
+
+  function layout() {
+    if (!R.length) return;
+    const n = rows();
+    rowH = Math.round(clamp((window.innerHeight * 0.56) / n, 46, 76));
+    const H = rowH * n;
+    const fs = clamp(rowH * 0.3, 14, 21);
+    const cnt = R.length;
+    const avail = stage.clientWidth - 16 - 120 - (cnt - 1) * 34;
+    const share = avail / cnt;
+    ctx.font = `500 ${fs}px Geist, system-ui, sans-serif`;
+    R.forEach((rr, i) => {
+      const items = state.reels[i].items;
+      const tw = Math.max(70, ...items.map(t => ctx.measureText(t || 'Escribe…').width));
+      const pad = 76;
+      const w = Math.round(clamp(tw + pad, 150, Math.max(150, Math.min(share, 520))));
+      const f = tw + pad > w ? Math.max(11, fs * (w - pad) / tw) : fs;
+      rr.win.style.width = w + 'px';
+      rr.win.style.height = H + 'px';
+      rr.root.style.width = w + 'px';
+      rr.root.style.setProperty('--fs', f.toFixed(1) + 'px');
+      rr.faces.forEach(o => { o.el.style.height = rowH + 'px'; });
+      paint(rr);
+    });
+    links.forEach(l => { l.style.width = '34px'; [...l.children].forEach(s => { s.style.height = rowH + 'px'; }); });
+    const add = inner.querySelector('.add-reel'); if (add) add.style.height = H + 'px';
+  }
+  let lt = 0;
+  const scheduleLayout = () => { cancelAnimationFrame(lt); lt = requestAnimationFrame(layout); };
+
+  function paint(rr) {
+    const n = rows();
+    const sm = ((rr.s % n) + n) % n;
+    const atRest = mode !== 'spinning';
+    rr.faces.forEach(o => {
+      const y = o.j + o.c * n + sm;          // posición en filas
+      const show = y > -1 && y < n;
+      o.el.style.visibility = show ? 'visible' : 'hidden';
+      if (!show) return;
+      o.el.style.transform = `translateY(${(y * rowH).toFixed(2)}px)`;
+      const usable = atRest && o.c === 0;
+      o.el.style.pointerEvents = usable ? 'auto' : 'none';
+      if (o.c === 0) o.input.tabIndex = usable ? 0 : -1;
+    });
+  }
+
+  /* ---------- mezcla automática ---------- */
+  let mixClock = 0, lastTick = performance.now();
+  function glitchShuffle(rr) {
+    const i = rr.ri;
+    const next = shuffleNew(state.reels[i].items);
+    rr.root.classList.remove('glitching'); void rr.root.offsetWidth; rr.root.classList.add('glitching');
+    const apply = () => {
+      state.reels[i].items = next;
+      rr.faces.forEach(o => { o.input.value = next[o.j]; });
+      save();
+    };
+    if (reduce) apply(); else setTimeout(apply, 140);
+    setTimeout(() => rr.root.classList.remove('glitching'), 400);
+  }
+  // pausa solo la ruleta en la que estás escribiendo
+  const editingReel = () => {
+    const a = document.activeElement;
+    if (!a || a.tagName !== 'INPUT' || !inner.contains(a)) return -1;
+    const m = /^r(\d+)-/.exec(a.id) || /^title-(\d+)/.exec(a.id);
+    return m ? +m[1] : -1;
+  };
+
+  function tick(now) {
+    const dt = now - lastTick; lastTick = now;
+    if (mode === 'mixing' && !document.hidden) {
+      mixClock += dt;
+      if (mixClock >= MIX_MS) {
+        mixClock = 0;
+        const busy = editingReel();
+        R.forEach(rr => { if (!rr.fixed && rr.ri !== busy) glitchShuffle(rr); });
+      }
+    }
+    requestAnimationFrame(tick);
+  }
+
+  function toMixing() {
+    mode = 'mixing'; mixClock = 0;
+    $('results').hidden = true; $('resume').hidden = true;
+    $('launch').firstChild.textContent = 'Lanzar ruleta ';
+    R.forEach(rr => rr.faces.forEach(o => o.el.classList.remove('hit')));
+    links.forEach(l => [...l.children].forEach(s => s.classList.remove('on')));
+  }
+
+  /* ---------- lanzar ---------- */
+  const easeOutCubic = u => 1 - Math.pow(1 - u, 3);
+  const easeInOutSine = u => -(Math.cos(Math.PI * u) - 1) / 2;
+  const GLYPHS = '#%&*+=<>/\\[]{}?!_-·░▒▓01';
+  const scramble = s => (s || '····').split('').map(ch => ch === ' ' || Math.random() < 0.55 ? ch : GLYPHS[(Math.random() * GLYPHS.length) | 0]).join('');
+
+  function launch() {
+    if (mode === 'spinning') return;
+    document.activeElement?.blur?.();
+    mode = 'spinning';
+    document.body.classList.add('is-spinning');
+    $('launch').disabled = true;
+    $('results').hidden = true; $('resume').hidden = true;
+    R.forEach(rr => rr.faces.forEach(o => o.el.classList.remove('hit')));
+    links.forEach(l => [...l.children].forEach(s => s.classList.remove('on')));
+
+    // última mezcla justo al presionar
+    R.forEach(rr => { if (!rr.fixed) glitchShuffle(rr); });
+
+    const n = rows();
+    const moving = R.filter(rr => !rr.fixed);
+    let done = 0;
+    setTimeout(() => {
+      moving.forEach((rr, k) => {
+        const end = n * (3 + k + (Math.random() < 0.5 ? 0 : 1));
+        const ov = 0.28;
+        const dur = reduce ? 450 + k * 150 : 1700 + k * 550 + Math.random() * 200;
+        const t0 = performance.now();
+        let prev = 0, prevT = t0;
+        const frame = now => {
+          const t = Math.min(1, (now - t0) / dur);
+          rr.s = t < 0.86 ? (end + ov) * easeOutCubic(t / 0.86) : end + ov - ov * easeInOutSine((t - 0.86) / 0.14);
+          const v = Math.abs(rr.s - prev) / Math.max(1, now - prevT);
+          prev = rr.s; prevT = now;
+          rr.root.style.setProperty('--blur', reduce ? '0px' : Math.min(4, v * 80).toFixed(2) + 'px');
+          const it = state.reels[rr.ri].items;
+          rr.faces.forEach(o => { o.input.value = (!reduce && v > 0.006 && Math.random() < 0.3) ? scramble(it[o.j]) : it[o.j]; });
+          paint(rr);
+          if (t < 1) { requestAnimationFrame(frame); return; }
+          rr.s = 0;
+          rr.root.style.setProperty('--blur', '0px');
+          rr.faces.forEach(o => { o.input.value = it[o.j]; });
+          if (++done === moving.length) finish();
+        };
+        requestAnimationFrame(frame);
+      });
+    }, reduce ? 0 : 380);
+  }
+
+  function finish() {
+    mode = 'result';
+    R.forEach(paint);
+    document.body.classList.remove('is-spinning');
+    $('launch').disabled = false;
+    $('launch').firstChild.textContent = 'Lanzar de nuevo ';
+    $('resume').hidden = false;
+    const n = rows();
+    for (let j = 0; j < n; j++) {
+      setTimeout(() => {
+        R.forEach(rr => rr.faces.forEach(o => { if (o.c === 0 && o.j === j) o.el.classList.add('hit'); }));
+        links.forEach(l => l.children[j]?.classList.add('on'));
+      }, reduce ? 0 : j * 110);
+    }
+    $('results').hidden = false;
+    renderResults(true);
+  }
+
+  /* ---------- filas, ruletas y pegado ---------- */
+  function addRow() {
+    if (mode === 'spinning' || rows() >= MAX_ROWS) return;
+    state.reels.forEach(r => r.items.push(''));
+    save(); toMixing(); build([0, rows() - 1]);
+  }
+  function removeRow(j) {
+    if (mode === 'spinning' || rows() <= 2) return;
+    state.reels.forEach(r => r.items.splice(j, 1));
+    save(); toMixing(); build();
+  }
+  function addReel() {
+    if (mode === 'spinning' || state.reels.length >= MAX_REELS) return;
+    const n = rows(), num = state.reels.length + 1;
+    state.reels.push({ title: 'Ruleta ' + num, items: Array.from({ length: n }, (_, i) => 'Opción ' + (i + 1)) });
+    save(); toMixing(); build([num - 1, 0]);
+    stage.scrollTo({ left: stage.scrollWidth, behavior: 'smooth' });
+  }
+  function pasteLines(ri, j, lines) {
+    if (mode === 'spinning') return;
+    const need = Math.min(MAX_ROWS, j + lines.length);
+    while (rows() < need) state.reels.forEach(r => r.items.push(''));
+    const reel = state.reels[ri];
+    let last = j;
+    lines.forEach((t, k) => { if (j + k < rows()) { reel.items[j + k] = t; last = j + k; } });
+    save();
+    if (mode === 'result') toMixing();
+    build([ri, last]);
+    const skipped = lines.length - (last - j + 1);
+    toast(skipped > 0 ? `Se pegaron ${last - j + 1} líneas (máximo ${MAX_ROWS} filas)` : `Se pegaron ${last - j + 1} líneas`);
+  }
+
+  /* ---------- resultado ---------- */
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  function renderResults(reveal) {
+    if (mode !== 'result') return;
+    const n = rows(), box = $('results');
+    let h = '<div class="table-wrap"><table class="res-table"><thead><tr><th style="color:var(--muted)">#</th>';
+    state.reels.forEach((r, i) => {
+      if (i > 0) h += '<th></th>';
+      h += `<th style="color:var(${COLORS[i % COLORS.length]})">${esc(r.title || 'Ruleta ' + (i + 1))}</th>`;
+    });
+    h += '</tr></thead><tbody>';
+    for (let k = 0; k < n; k++) {
+      h += `<tr style="animation-delay:${k * 70}ms"><td class="n">${String(k + 1).padStart(2, '0')}</td>`;
+      state.reels.forEach((r, i) => { if (i > 0) h += '<td class="arrow">→</td>'; h += `<td>${esc(r.items[k] || '—')}</td>`; });
+      h += '</tr>';
+    }
+    $('resBody').innerHTML = h + '</tbody></table></div>';
+    if (reveal) { box.classList.remove('reveal'); void box.offsetWidth; box.classList.add('reveal'); }
+    else box.classList.remove('reveal');
+  }
+
+  function renderMeta() {
+    const n = rows(), c = state.reels.length;
+    let fact = 1; for (let i = 2; i <= n; i++) fact *= i;
+    const combos = Math.pow(fact, c - 1);
+    const fmt = combos < 1e9 ? combos.toLocaleString('es-CL') : combos.toExponential(2).replace('e+', ' × 10^');
+    $('meta').innerHTML = `<span><b>${c}</b> ruletas</span><span><b>${n}</b> filas</span><span><b>${fmt}</b> repartos posibles</span>`;
+  }
+
+  function toast(m) { const t = $('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove('show'), 1600); }
+
+  /* ---------- eventos ---------- */
+  $('launch').addEventListener('click', launch);
+  $('addRow').addEventListener('click', addRow);
+  $('resume').addEventListener('click', toMixing);
+  $('copy').addEventListener('click', () => {
+    const n = rows(), lines = [];
+    for (let k = 0; k < n; k++) lines.push(`${k + 1}. ` + state.reels.map(r => r.items[k] || '—').join(' → '));
+    const text = lines.join('\n');
+    const fallback = () => {
+      const ta = document.createElement('textarea'); ta.value = text; document.body.append(ta); ta.select();
+      try { document.execCommand('copy'); toast('Copiado'); } catch (e) { toast('No se pudo copiar'); }
+      ta.remove();
+    };
+    try { navigator.clipboard.writeText(text).then(() => toast('Copiado'), fallback); } catch (e) { fallback(); }
+  });
+  document.addEventListener('keydown', e => {
+    const tag = (e.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'button') return;
+    if (e.code === 'Space') { e.preventDefault(); launch(); }
+  });
+  window.addEventListener('resize', scheduleLayout);
+
+  build();
+  requestAnimationFrame(tick);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layout);
+})();
+</script>
+
+</body></html>
