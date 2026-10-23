@@ -133,7 +133,33 @@ button{font-family:inherit}
 @media (hover:none){.face .del{opacity:.6}}
 
 .is-spinning .face input{text-shadow:1.5px 0 var(--g-red),-1.5px 0 var(--g-cyan)}
-.reel.glitching .face input{animation:jit .38s steps(4) both}
+.face .slice{
+  position:absolute;inset:0;z-index:1;display:flex;align-items:center;justify-content:center;
+  padding:0 34px;box-sizing:border-box;white-space:nowrap;overflow:hidden;pointer-events:none;
+  font:500 var(--fs,19px)/1.2 var(--font-ui);opacity:0;mix-blend-mode:screen;
+}
+.face .slice.a{color:var(--g-red)}
+.face .slice.b{color:var(--g-cyan)}
+.reel.scrambling .face input{color:color-mix(in srgb,var(--c) 70%,#fff)}
+.reel.scrambling .face .slice.a{animation:tearA .34s steps(1) var(--d,0ms) both}
+.reel.scrambling .face .slice.b{animation:tearB .34s steps(1) var(--d,0ms) both}
+@keyframes tearA{
+  0%{opacity:1;clip-path:inset(8% 0 68% 0);transform:translateX(calc(var(--x,5px) * -1))}
+  20%{opacity:1;clip-path:inset(58% 0 12% 0);transform:translateX(var(--x,5px))}
+  40%{opacity:1;clip-path:inset(30% 0 48% 0);transform:translateX(calc(var(--x,5px) * -.6))}
+  60%{opacity:1;clip-path:inset(76% 0 4% 0);transform:translateX(calc(var(--x,5px) * .5))}
+  80%{opacity:.7;clip-path:inset(0 0 84% 0);transform:translateX(-2px)}
+  100%{opacity:0;clip-path:inset(0);transform:none}
+}
+@keyframes tearB{
+  0%{opacity:1;clip-path:inset(62% 0 14% 0);transform:translateX(var(--x,5px))}
+  20%{opacity:1;clip-path:inset(12% 0 64% 0);transform:translateX(calc(var(--x,5px) * -.8))}
+  40%{opacity:1;clip-path:inset(70% 0 6% 0);transform:translateX(calc(var(--x,5px) * .4))}
+  60%{opacity:1;clip-path:inset(22% 0 56% 0);transform:translateX(calc(var(--x,5px) * -.5))}
+  80%{opacity:.7;clip-path:inset(86% 0 0 0);transform:translateX(2px)}
+  100%{opacity:0;clip-path:inset(0);transform:none}
+}
+.reel.glitching .face input{animation:jit .3s steps(4) both}
 .reel.glitching .window{animation:shake .38s steps(3)}
 @keyframes jit{
   0%{text-shadow:none;clip-path:inset(0)}
@@ -239,7 +265,7 @@ button{font-family:inherit}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){
   .glitch::before,.glitch::after{animation:none!important}
-  .reel.glitching .face input,.reel.glitching .window,.results.reveal tbody tr,.modal[open]{animation:none}
+  .reel.glitching .face input,.reel.glitching .window,.results.reveal tbody tr,.modal[open],.reel.scrambling .face .slice{animation:none}
 }
 </style>
 </head>
@@ -300,7 +326,7 @@ button{font-family:inherit}
   const inner = $('inner'), stage = $('stage');
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const MIX_MS = 3000, SCRAMBLE_MS = 450, MAX_ROWS = 12, MAX_REELS = 6;
+  const MIX_MS = 3000, SCRAMBLE_MS = 350, MAX_ROWS = 12, MAX_REELS = 6;
   const COLORS = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c6'];
 
   const T = {
@@ -450,8 +476,11 @@ button{font-family:inherit}
             inp.tabIndex = -1; inp.setAttribute('aria-hidden', 'true'); inp.readOnly = true;
           }
           f.prepend(inp);
+          const sa = el('span', 'slice a'), sb = el('span', 'slice b');
+          sa.setAttribute('aria-hidden', 'true'); sb.setAttribute('aria-hidden', 'true');
+          f.append(sa, sb);
           win.append(f);
-          faces.push({ el: f, input: inp, j, c });
+          faces.push({ el: f, input: inp, j, c, sa, sb });
         }
       }
       root.append(head, win);
@@ -524,15 +553,20 @@ button{font-family:inherit}
     if (!rr.scr) return;
     cancelAnimationFrame(rr.scr);
     rr.scr = 0;
+    rr.root.classList.remove('scrambling');
     const it = state.reels[rr.ri]?.items;
     rr.faces.forEach(o => {
       if (it) o.input.value = it[o.j] ?? '';
       if (o.c === 0) o.input.readOnly = false;
+      o.sa.textContent = o.sb.textContent = '';
     });
   }
+  const BROKEN = '▓▒░█▀▄▌▐_/\\';
+  // Letters "break" into blocks, then heal left to right; untouched letters keep the word readable.
   const decode = (s, p) => {
-    const shown = Math.max(0, (p - 0.35) / 0.65) * s.length;
-    return s.split('').map((ch, k) => k < shown || ch === ' ' ? ch : GLYPHS[(Math.random() * GLYPHS.length) | 0]).join('');
+    const shown = Math.max(0, (p - 0.3) / 0.7) * s.length;
+    const odds = 0.65 * (1 - p);
+    return s.split('').map((ch, k) => k < shown || ch === ' ' || Math.random() > odds + 0.2 ? ch : BROKEN[(Math.random() * BROKEN.length) | 0]).join('');
   };
   function glitchShuffle(rr) {
     stopScramble(rr);
@@ -543,16 +577,21 @@ button{font-family:inherit}
     save();
     rr.root.classList.remove('glitching'); void rr.root.offsetWidth; rr.root.classList.add('glitching');
     clearTimeout(rr.gt);
-    rr.gt = setTimeout(() => rr.root.classList.remove('glitching'), 400);
-    if (reduce) { rr.faces.forEach(o => { o.input.value = next[o.j]; }); return; }
-    rr.faces.forEach(o => { if (o.c === 0) o.input.readOnly = true; });
-    const t0 = performance.now();
+    rr.gt = setTimeout(() => rr.root.classList.remove('glitching'), 320);
+    rr.faces.forEach(o => {
+      if (o.c === 0) o.input.readOnly = true;
+      o.el.style.setProperty('--d', ((Math.random() * 60) | 0) + 'ms');
+      o.el.style.setProperty('--x', (3 + Math.random() * 6).toFixed(1) + 'px');
+      o.sa.textContent = o.sb.textContent = next[o.j] || '';
+    });
+    rr.root.classList.add('scrambling');
+    const t0 = performance.now(), step = reduce ? 70 : 20;
     let last = 0;
     const frame = now => {
       try {
         const p = (now - t0) / SCRAMBLE_MS;
         if (p >= 1) { stopScramble(rr); return; }
-        if (now - last >= 45) {
+        if (now - last >= step) {
           last = now;
           rr.faces.forEach(o => { o.input.value = decode(next[o.j] || '', p); });
         }
