@@ -164,7 +164,7 @@ button{font-family:inherit}
 .add-reel:hover{border-color:#40404c;color:var(--fg);background:rgba(255,255,255,.02)}
 .add-reel svg{width:20px;height:20px}
 
-.under{display:flex;justify-content:center}
+.under{display:flex;justify-content:center;flex-wrap:wrap;gap:10px}
 .ghost{
   appearance:none;border:1px dashed var(--line);background:transparent;color:var(--muted);cursor:pointer;
   height:36px;padding:0 14px;border-radius:10px;font:500 13px/1 var(--font-ui);display:inline-flex;align-items:center;gap:8px;
@@ -212,6 +212,26 @@ button{font-family:inherit}
   50%{opacity:1;clip-path:inset(0 30% 0 0);text-shadow:2px 0 var(--g-red),-2px 0 var(--g-cyan)}
   100%{opacity:1;clip-path:inset(0);text-shadow:none}
 }
+.modal{
+  border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--fg);
+  padding:22px 22px 18px;width:min(400px,calc(100% - 32px));box-sizing:border-box;
+  box-shadow:0 24px 60px rgba(0,0,0,.55),0 0 0 1px rgba(122,162,255,.06);
+}
+.modal[open]{animation:modalin .32s steps(4) both}
+.modal::backdrop{background:rgba(5,5,8,.68);backdrop-filter:blur(3px)}
+.modal h3{margin:0 0 8px;font-size:17px;font-weight:600;background:linear-gradient(90deg,var(--c1),var(--c2) 45%,var(--c3));-webkit-background-clip:text;background-clip:text;color:transparent}
+.modal p{margin:0 0 20px;color:var(--muted);font-size:14px;line-height:1.5}
+.modal-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.modal-ok{
+  appearance:none;border:0;cursor:pointer;height:36px;padding:0 16px;border-radius:10px;
+  background:linear-gradient(100deg,var(--c1),var(--c2) 55%,var(--c3));color:#0c0c14;font:600 13px/1 var(--font-ui);
+}
+.modal-ok:hover{filter:brightness(1.08)}
+@keyframes modalin{
+  0%{opacity:0;transform:translateX(-4px);clip-path:inset(40% 0 40% 0)}
+  50%{opacity:1;transform:translateX(3px);clip-path:inset(10% 0 20% 0);filter:drop-shadow(2px 0 var(--g-red)) drop-shadow(-2px 0 var(--g-cyan))}
+  100%{opacity:1;transform:none;clip-path:inset(0);filter:none}
+}
 .toast{
   position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,20px);
   background:var(--fg);color:var(--bg);font:500 13px/1 var(--font-ui);padding:10px 14px;border-radius:10px;opacity:0;pointer-events:none;transition:.2s;z-index:60;
@@ -219,7 +239,7 @@ button{font-family:inherit}
 .toast.show{opacity:1;transform:translate(-50%,0)}
 @media (prefers-reduced-motion:reduce){
   .glitch::before,.glitch::after{animation:none!important}
-  .reel.glitching .face input,.reel.glitching .window,.results.reveal tbody tr{animation:none}
+  .reel.glitching .face input,.reel.glitching .window,.results.reveal tbody tr,.modal[open]{animation:none}
 }
 </style>
 </head>
@@ -243,6 +263,10 @@ button{font-family:inherit}
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M8 3v10M3 8h10"/></svg>
       <span data-i="addRow">Agregar fila</span>
     </button>
+    <button class="ghost" id="reset" hidden>
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 3v3.5h3.5"/><path d="M3.4 6.5A5 5 0 1 1 3 9"/></svg>
+      <span data-i="reset">Restablecer ejemplo</span>
+    </button>
   </div>
 
   <div class="launch-wrap">
@@ -259,6 +283,14 @@ button{font-family:inherit}
     <div id="resBody"></div>
   </section>
 </div>
+<dialog class="modal" id="confirm" aria-labelledby="confirmTitle" aria-describedby="confirmText">
+  <h3 id="confirmTitle" data-i="resetTitle">Restablecer ejemplo</h3>
+  <p id="confirmText" data-i="resetAsk"></p>
+  <div class="modal-actions">
+    <button class="ghost" id="confirmNo" data-i="cancel">Cancelar</button>
+    <button class="modal-ok" id="confirmYes" data-i="resetOk">Restablecer</button>
+  </div>
+</dialog>
 <div class="toast" id="toast">Copiado</div>
 
 <script>
@@ -268,7 +300,7 @@ button{font-family:inherit}
   const inner = $('inner'), stage = $('stage');
   const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
   const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const MIX_MS = 3000, MAX_ROWS = 12, MAX_REELS = 6;
+  const MIX_MS = 3000, SCRAMBLE_MS = 450, MAX_ROWS = 12, MAX_REELS = 6;
   const COLORS = ['--c1', '--c2', '--c3', '--c4', '--c5', '--c6'];
 
   const T = {
@@ -277,6 +309,7 @@ button{font-family:inherit}
       resume: 'Volver a mezclar', assignment: 'Asignación', copy: 'Copiar resultado', copied: 'Copiado', copyFail: 'No se pudo copiar',
       type: 'Escribe…', reel: 'Ruleta', option: 'Opción', row: 'fila', reelName: 'Nombre de la ruleta', removeReel: 'Quitar esta ruleta',
       removeRow: 'Quitar esta fila', wheels: 'ruletas', rows: 'filas', combos: 'repartos posibles',
+      reset: 'Restablecer ejemplo', resetTitle: '¿Restablecer ejemplo?', resetAsk: 'Se volverá a los integrantes y temas de ejemplo. Se perderá lo que escribiste.', resetOk: 'Restablecer', cancel: 'Cancelar', resetDone: 'Ejemplo restablecido',
       pasted: n => `Se pegaron ${n} líneas`, pastedMax: (n, m) => `Se pegaron ${n} líneas (máximo ${m} filas)`,
       locale: 'es-CL',
       desc: 'Ruleta múltiple que empareja varias listas en un solo giro: integrantes con temas, personas con tareas, equipos con turnos o lo que necesites sortear.',
@@ -290,6 +323,7 @@ button{font-family:inherit}
       resume: 'Shuffle again', assignment: 'Assignment', copy: 'Copy result', copied: 'Copied', copyFail: "Couldn't copy",
       type: 'Type…', reel: 'Wheel', option: 'Option', row: 'row', reelName: 'Wheel name', removeReel: 'Remove this wheel',
       removeRow: 'Remove this row', wheels: 'wheels', rows: 'rows', combos: 'possible draws',
+      reset: 'Reset example', resetTitle: 'Reset example?', resetAsk: 'This brings back the sample members and topics. What you typed will be lost.', resetOk: 'Reset', cancel: 'Cancel', resetDone: 'Example restored',
       pasted: n => `Pasted ${n} lines`, pastedMax: (n, m) => `Pasted ${n} lines (max ${m} rows)`,
       locale: 'en-US',
       desc: 'Spin several wheels at once to pair lists in a single draw: members with topics, people with tasks, teams with shifts or anything you need to assign.',
@@ -317,7 +351,7 @@ button{font-family:inherit}
   let state;
   try { state = JSON.parse(localStorage.getItem(KEY)) || JSON.parse(localStorage.getItem('reparto-ruletas-v2')); } catch (e) { state = null; }
   if (!state || !Array.isArray(state.reels) || state.reels.length < 2) state = { reels: structuredClone(T[lang].sample) };
-  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ reels: state.reels })); } catch (e) {} };
+  const save = () => { try { localStorage.setItem(KEY, JSON.stringify({ reels: state.reels })); } catch (e) {} updateReset(); };
 
   let mode = 'mixing';
   const R = [];
@@ -345,6 +379,7 @@ button{font-family:inherit}
 
   function build(focus) {
     const n = rows();
+    R.forEach(rr => { cancelAnimationFrame(rr.scr); clearTimeout(rr.gt); });
     inner.innerHTML = '';
     R.length = 0; links = [];
     state.reels.forEach((reel, ri) => {
@@ -421,7 +456,9 @@ button{font-family:inherit}
       }
       root.append(head, win);
       inner.append(root);
-      R.push({ root, win, faces, s: 0, fixed, ri });
+      const rr = { root, win, faces, s: 0, fixed, ri, scr: 0, gt: 0 };
+      win.addEventListener('focusin', () => stopScramble(rr));
+      R.push(rr);
     });
 
     const add = el('button', 'add-reel');
@@ -482,17 +519,47 @@ button{font-family:inherit}
   }
 
   let mixClock = 0, lastTick = performance.now();
+  // Scrambled text is only drawn into the inputs; state is updated right away so a launch or copy never sees glitch characters.
+  function stopScramble(rr) {
+    if (!rr.scr) return;
+    cancelAnimationFrame(rr.scr);
+    rr.scr = 0;
+    const it = state.reels[rr.ri]?.items;
+    rr.faces.forEach(o => {
+      if (it) o.input.value = it[o.j] ?? '';
+      if (o.c === 0) o.input.readOnly = false;
+    });
+  }
+  const decode = (s, p) => {
+    const shown = Math.max(0, (p - 0.35) / 0.65) * s.length;
+    return s.split('').map((ch, k) => k < shown || ch === ' ' ? ch : GLYPHS[(Math.random() * GLYPHS.length) | 0]).join('');
+  };
   function glitchShuffle(rr) {
-    const i = rr.ri;
-    const next = shuffleNew(state.reels[i].items);
+    stopScramble(rr);
+    const reel = state.reels[rr.ri];
+    if (!reel) return;
+    const next = shuffleNew(reel.items);
+    reel.items = next;
+    save();
     rr.root.classList.remove('glitching'); void rr.root.offsetWidth; rr.root.classList.add('glitching');
-    const apply = () => {
-      state.reels[i].items = next;
-      rr.faces.forEach(o => { o.input.value = next[o.j]; });
-      save();
+    clearTimeout(rr.gt);
+    rr.gt = setTimeout(() => rr.root.classList.remove('glitching'), 400);
+    if (reduce) { rr.faces.forEach(o => { o.input.value = next[o.j]; }); return; }
+    rr.faces.forEach(o => { if (o.c === 0) o.input.readOnly = true; });
+    const t0 = performance.now();
+    let last = 0;
+    const frame = now => {
+      try {
+        const p = (now - t0) / SCRAMBLE_MS;
+        if (p >= 1) { stopScramble(rr); return; }
+        if (now - last >= 45) {
+          last = now;
+          rr.faces.forEach(o => { o.input.value = decode(next[o.j] || '', p); });
+        }
+        rr.scr = requestAnimationFrame(frame);
+      } catch (e) { stopScramble(rr); }
     };
-    if (reduce) apply(); else setTimeout(apply, 140);
-    setTimeout(() => rr.root.classList.remove('glitching'), 400);
+    rr.scr = requestAnimationFrame(frame);
   }
   const editingReel = () => {
     const a = document.activeElement;
@@ -502,7 +569,7 @@ button{font-family:inherit}
   };
 
   function tick(now) {
-    const dt = now - lastTick; lastTick = now;
+    const dt = Math.min(100, now - lastTick); lastTick = now;
     if (mode === 'mixing' && !document.hidden) {
       mixClock += dt;
       if (mixClock >= MIX_MS) {
@@ -544,6 +611,7 @@ button{font-family:inherit}
     let done = 0;
     setTimeout(() => {
       moving.forEach((rr, k) => {
+        stopScramble(rr);
         const end = n * (3 + k + (Math.random() < 0.5 ? 0 : 1));
         const ov = 0.28;
         const dur = reduce ? 450 + k * 150 : 1700 + k * 550 + Math.random() * 200;
@@ -671,6 +739,23 @@ button{font-family:inherit}
 
   const sameSet = (a, b) => a.length === b.length && [...a].sort().join('\u0001') === [...b].sort().join('\u0001');
   const isSample = code => state.reels.length === 2 && T[code].sample.every((s, i) => s.title === state.reels[i].title && sameSet(s.items, state.reels[i].items));
+  function updateReset() { $('reset').hidden = isSample(lang); }
+  function resetSample() {
+    if (mode === 'spinning' || isSample(lang)) return;
+    state.reels = structuredClone(t().sample);
+    save(); toMixing(); build();
+    toast(t().resetDone);
+  }
+  const dlg = $('confirm');
+  $('reset').addEventListener('click', () => {
+    if (mode === 'spinning' || dlg.open) return;
+    if (typeof dlg.showModal !== 'function') { if (confirm(t().resetAsk)) resetSample(); return; }
+    dlg.showModal();
+    $('confirmNo').focus();
+  });
+  $('confirmNo').addEventListener('click', () => dlg.close());
+  $('confirmYes').addEventListener('click', () => { dlg.close(); resetSample(); });
+  dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
   function applyLang(next, user) {
     if (next !== lang && isSample(lang)) state.reels = structuredClone(T[next].sample);
     lang = next;
