@@ -548,7 +548,6 @@ button{font-family:inherit}
   }
 
   let mixClock = 0, lastTick = performance.now();
-  // Scrambled text is only drawn into the inputs; state is updated right away so a launch or copy never sees glitch characters.
   function stopScramble(rr) {
     if (!rr.scr) return;
     cancelAnimationFrame(rr.scr);
@@ -562,7 +561,6 @@ button{font-family:inherit}
     });
   }
   const BROKEN = '▓▒░█▀▄▌▐_/\\';
-  // Letters "break" into blocks, then heal left to right; untouched letters keep the word readable.
   const decode = (s, p) => {
     const shown = Math.max(0, (p - 0.3) / 0.7) * s.length;
     const odds = 0.65 * (1 - p);
@@ -790,10 +788,16 @@ button{font-family:inherit}
     if (mode === 'spinning' || dlg.open) return;
     if (typeof dlg.showModal !== 'function') { if (confirm(t().resetAsk)) resetSample(); return; }
     dlg.showModal();
-    $('confirmNo').focus();
+    $('confirmYes').focus();
   });
+  const confirmReset = () => { if (!dlg.open) return; dlg.close(); resetSample(); };
   $('confirmNo').addEventListener('click', () => dlg.close());
-  $('confirmYes').addEventListener('click', () => { dlg.close(); resetSample(); });
+  $('confirmYes').addEventListener('click', confirmReset);
+  dlg.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    if (!e.repeat) confirmReset();
+  });
   dlg.addEventListener('click', e => { if (e.target === dlg) dlg.close(); });
   function applyLang(next, user) {
     if (next !== lang && isSample(lang)) state.reels = structuredClone(T[next].sample);
